@@ -1,0 +1,377 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  restaurant
+  user
+  admin
+}
+
+enum TaskStatus {
+  active
+  paused
+  deleted
+}
+
+enum TaskPlatform {
+  instagram
+  tiktok
+  linkedin
+  youtube
+  google_review
+  other
+}
+
+enum SubmissionStatus {
+  pending
+  approved
+  rejected
+}
+
+enum TransactionType {
+  earn
+  spend
+  reserve
+  release
+  adjustment
+}
+
+enum ReferenceType {
+  task_creation
+  task_deletion
+  submission_approval
+  admin_adjustment
+  reservation_release
+  daily_claim
+  onboarding_quest_reward
+  referral_bonus
+  referral_conversion
+  restaurant_onboarding
+}
+
+enum TaskEventType {
+  completed
+  rejected
+  streak_bonus
+  daily_claim
+  onboarding_quest_completed
+  referral_invited
+  referral_converted
+  social_verified
+  restaurant_onboarded
+}
+
+enum SocialConnectionStatus {
+  disconnected
+  connected_unverified
+  connected_verified
+}
+
+enum OnboardingQuestStatus {
+  in_progress
+  completed
+  claimed
+}
+
+enum OnboardingQuestTriggerType {
+  mission_submitted
+  submission_approved
+  daily_claim
+  social_verified
+  restaurant_onboarded
+  task_created
+  submission_reviewed
+  referral_applied
+  referral_conversion
+}
+
+enum OnboardingQuestPersona {
+  player
+  venue
+  both
+}
+
+enum ReferralStatus {
+  applied
+  qualified
+  rewarded
+}
+
+model User {
+  id               String           @id @default(cuid())
+  walletAddress    String?          @unique
+  email            String?          @unique
+  role             UserRole         @default(user)
+  picksBalance     BigInt           @default(0)
+  reservedBalance  BigInt           @default(0)
+  createdAt        DateTime         @default(now())
+  restaurants      Restaurant[]
+  submissions      TaskSubmission[]
+  transactions     TransactionLog[] @relation("UserTransaction")
+  counterpartyLogs TransactionLog[] @relation("CounterpartyTransaction")
+  adViews          AdPlaceholderView[]
+  dailyClaims      DailyClaim[]
+  taskerProfile    TaskerProfile?
+  taskEvents       TaskEvent[]
+  onboardingQuestProgresses UserOnboardingQuestProgress[]
+  referralCodes    ReferralCode[]
+  referralsSent    Referral[]       @relation("ReferrerUser")
+  referralReceived Referral?        @relation("ReferredUser")
+
+  @@index([role])
+}
+
+model Restaurant {
+  id         String         @id @default(cuid())
+  ownerId    String
+  owner      User           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  name       String
+  latitude   Decimal?       @db.Decimal(9, 6)
+  longitude  Decimal?       @db.Decimal(9, 6)
+  district   String?
+  slug       String         @unique
+  createdAt  DateTime       @default(now())
+  categories MenuCategory[]
+  tasks      Task[]
+
+  @@index([ownerId])
+}
+
+model GamificationSeed {
+  id                String   @id @default(cuid())
+  city              String
+  district          String
+  restaurantsActive Int
+  restaurantsTarget Int
+
+  @@index([city, district])
+}
+
+model RestaurantLead {
+  id              String   @id @default(cuid())
+  restaurantName  String
+  district        String
+  phoneOrWhatsApp String
+  createdAt       DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([district, createdAt])
+}
+
+model MenuCategory {
+  id           String     @id @default(cuid())
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  name         String
+  items        MenuItem[]
+
+  @@unique([restaurantId, name])
+  @@index([restaurantId])
+}
+
+model MenuItem {
+  id         String       @id @default(cuid())
+  categoryId String
+  category   MenuCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  name       String
+  price      BigInt
+  currency   String       @default("USD")
+
+  @@unique([categoryId, name])
+  @@index([categoryId])
+}
+
+model Task {
+  id           String           @id @default(cuid())
+  restaurantId String
+  restaurant   Restaurant       @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  title        String
+  description  String
+  platform     TaskPlatform     @default(other)
+  rewardAmount BigInt
+  status       TaskStatus       @default(active)
+  createdAt    DateTime         @default(now())
+  submissions  TaskSubmission[]
+
+  @@index([restaurantId, status])
+}
+
+model TaskSubmission {
+  id        String           @id @default(cuid())
+  taskId    String
+  userId    String
+  task      Task             @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  proofUrl  String
+  status    SubmissionStatus @default(pending)
+  createdAt DateTime         @default(now())
+
+  @@unique([taskId, userId])
+  @@index([taskId])
+  @@index([userId, createdAt])
+}
+
+model TransactionLog {
+  id                 String          @id @default(cuid())
+  userId             String
+  user               User            @relation("UserTransaction", fields: [userId], references: [id], onDelete: Cascade)
+  counterpartyUserId String?
+  counterpartyUser   User?           @relation("CounterpartyTransaction", fields: [counterpartyUserId], references: [id], onDelete: SetNull)
+  type               TransactionType
+  amount             BigInt
+  referenceType      ReferenceType
+  referenceId        String
+  metadata           Json?
+  createdAt          DateTime        @default(now())
+
+  @@unique([referenceType, referenceId, type, userId])
+  @@index([userId, createdAt])
+  @@index([type, createdAt])
+}
+
+model AdPlaceholderView {
+  id           String      @id @default(cuid())
+  userId       String
+  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  placementKey String
+  sessionId    String?
+  metadata     Json?
+  viewedAt     DateTime    @default(now())
+  claim        DailyClaim?
+
+  @@index([userId, viewedAt])
+  @@index([placementKey, viewedAt])
+}
+
+model DailyClaim {
+  id                  String            @id @default(cuid())
+  userId              String
+  user                User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  adPlaceholderViewId String            @unique
+  adPlaceholderView   AdPlaceholderView @relation(fields: [adPlaceholderViewId], references: [id], onDelete: Cascade)
+  amount              BigInt
+  claimedAt           DateTime          @default(now())
+  cooldownEndsAt      DateTime
+
+  @@index([userId, claimedAt])
+  @@index([userId, cooldownEndsAt])
+}
+
+model TaskerProfile {
+  id              String                 @id @default(cuid())
+  userId          String                 @unique
+  user            User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  xp              Int                    @default(0)
+  level           Int                    @default(1)
+  currentStreak   Int                    @default(0)
+  highestStreak   Int                    @default(0)
+  totalMissions   Int                    @default(0)
+  totalEarned     BigInt                 @default(0)
+  instagramHandle String?
+  instagramStatus SocialConnectionStatus @default(disconnected)
+  tiktokHandle    String?
+  tiktokStatus    SocialConnectionStatus @default(disconnected)
+  linkedinHandle  String?
+  linkedinStatus  SocialConnectionStatus @default(disconnected)
+  lastActiveAt    DateTime?
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+
+  @@index([level, xp])
+}
+
+model TaskEvent {
+  id          String        @id @default(cuid())
+  userId      String
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type        TaskEventType
+  referenceId String
+  picksAmount BigInt?
+  xpGranted   Int?
+  createdAt   DateTime      @default(now())
+  metadata    Json?
+
+  @@index([userId, createdAt])
+  @@index([type, createdAt])
+  @@unique([userId, type, referenceId])
+}
+
+model OnboardingQuest {
+  id          String                     @id @default(cuid())
+  key         String                     @unique
+  title       String
+  description String
+  persona     OnboardingQuestPersona     @default(player)
+  triggerType OnboardingQuestTriggerType
+  targetCount Int                        @default(1)
+  rewardPicks BigInt                     @default(0)
+  rewardXp    Int                        @default(0)
+  active      Boolean                    @default(true)
+  createdAt   DateTime                   @default(now())
+  updatedAt   DateTime                   @updatedAt
+  progresses  UserOnboardingQuestProgress[]
+
+  @@index([persona, active])
+  @@index([triggerType, active])
+}
+
+model UserOnboardingQuestProgress {
+  id              String                @id @default(cuid())
+  userId          String
+  questId         String
+  user            User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  quest           OnboardingQuest       @relation(fields: [questId], references: [id], onDelete: Cascade)
+  progress        Int                   @default(0)
+  status          OnboardingQuestStatus @default(in_progress)
+  completedAt     DateTime?
+  rewardClaimedAt DateTime?
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  @@unique([userId, questId])
+  @@index([userId, status])
+  @@index([questId, status])
+}
+
+model ReferralCode {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  code      String   @unique
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  referrals Referral[]
+
+  @@index([userId, active])
+}
+
+model Referral {
+  id             String        @id @default(cuid())
+  referrerUserId String
+  referrerUser   User          @relation("ReferrerUser", fields: [referrerUserId], references: [id], onDelete: Cascade)
+  referredUserId String        @unique
+  referredUser   User          @relation("ReferredUser", fields: [referredUserId], references: [id], onDelete: Cascade)
+  codeId         String
+  code           ReferralCode  @relation(fields: [codeId], references: [id], onDelete: Cascade)
+  status         ReferralStatus @default(applied)
+  metadata       Json?
+  createdAt      DateTime      @default(now())
+  qualifiedAt    DateTime?
+  rewardedAt     DateTime?
+
+  @@index([referrerUserId, status])
+  @@index([codeId, status])
+}
