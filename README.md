@@ -1,36 +1,90 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# BiteMine
 
-## Getting Started
+BiteMine is a mobile-first growth platform for restaurants and contributors:
 
-First, run the development server:
+- Restaurants launch AI-assisted QR menus and social missions.
+- Contributors complete missions, submit proof, and earn offchain `PICKS`.
+- Gamification includes quests, levels, streaks, leaderboards, district progress, and referral rewards.
+
+This repo is demo-ready with seeded data for local showcase flows.
+
+## Tech Stack
+
+- Next.js 14 (App Router), TypeScript
+- Tailwind CSS + custom premium UI primitives
+- Prisma + PostgreSQL
+- Framer Motion + Sonner
+- OpenAI Vision for menu extraction (optional at runtime)
+
+## Quick Start (Local)
+
+### 1) Install
+
+```bash
+npm install
+```
+
+### 2) Environment
+
+Create `.env` in project root with at least:
+
+```bash
+DATABASE_URL="postgresql://<user>:<password>@localhost:5432/premium?schema=billion"
+DEMO_MODE=true
+OPENAI_API_KEY=<your_openai_key_optional_for_full_ai_menu_extraction>
+```
+
+Notes:
+- `OPENAI_API_KEY` is required only for real AI menu extraction.
+- With `DEMO_MODE=true`, fallback/demo flows are available.
+
+### 3) Prisma setup
+
+```bash
+npm run prisma:generate
+npx prisma db push
+npm run prisma:seed
+```
+
+### 4) Run
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open the local URL shown in terminal.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Demo Routes
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- Landing: `/`
+- Public restaurant page (menu + missions): `/r/sunset-bistro`
+- Public page with personalized progress: `/r/sunset-bistro?userId=<taskerUserId>`
+- Player hub: `/player?userId=<taskerUserId>`
+- Rewards center: `/rewards?userId=<taskerUserId>`
+- Restaurant onboarding: `/restaurant/onboarding`
+- Restaurant dashboard: `/restaurant/dashboard`
+- Admin: `/admin`
 
-## Learn More
+## 5-Minute Demo Script
 
-To learn more about Next.js, take a look at the following resources:
+1. Open `/` and show the people-first hero + live sections.
+2. Go to `/restaurant/onboarding`, upload photos, share location, publish.
+3. Open `/r/sunset-bistro?userId=<taskerUserId>`, pick a mission, submit proof.
+4. Go to `/restaurant/dashboard`, approve pending submission.
+5. Return to `/player` and `/rewards` to show updated progress, quests, and referral loop.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Core Commands
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+npm run dev
+npm run lint
+npm run build
+npm run prisma:generate
+npm run prisma:seed
+```
 
-## Deploy on Vercel
+## Important Notes
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `PICKS` are DB credits in this MVP (offchain), with service-layer design ready for future onchain sync.
+- Rewards are transaction-logged and idempotent through backend services.
+- If dev server chunk errors appear, stop duplicate dev servers, delete `.next`, then restart `npm run dev`.
